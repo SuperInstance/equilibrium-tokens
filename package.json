@@ -1,0 +1,17 @@
+{
+  "name": "equilibrium-tokens",
+  "version": "0.1.0",
+  "description": "Constraint grammar for human-machine conversation navigation",
+  "main": "src/equilibrium_orchestrator.js",
+  "scripts": {
+    "test": "echo \"See TypeScript tests in tests/\"",
+    "build": "echo \"See Rust build via Cargo\""
+  },
+  "keywords": ["ai", "conversation", "constraint", "equilibrium", "navigation"],
+  "author": "Casey Gallagher <casey@deckboss.ai>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SuperInstance/equilibrium-tokens.git"
+  }
+}
