@@ -22,16 +22,17 @@ pub enum RAGIndexError {
 pub struct RAGIndex {
     /// Underlying vector store
     store: VectorStoreImpl,
-    /// Index dimensions
-    dimensions: usize,
 }
 
 impl RAGIndex {
     /// Create a new RAG index
+    ///
+    /// # Arguments
+    ///
+    /// * `dimensions` - Embedding dimension for vectors in the index
     pub fn new(dimensions: usize) -> Self {
         Self {
             store: VectorStoreImpl::new(dimensions),
-            dimensions,
         }
     }
 

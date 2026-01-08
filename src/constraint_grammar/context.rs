@@ -2,9 +2,18 @@
 //!
 //! The spatial constraint governing basin navigation in the frozen territory.
 //! Navigates conversation context using semantic similarity and sentiment weighting.
+//!
+//! # Timeless Code Principles
+//!
+//! This module implements the **spatial noun phrase** of the constraint grammar,
+//! governing how we navigate through conversation context basins using geometric
+//! similarity (cosine similarity) and affective weighting (VAD model).
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+// Re-export VADScores from the sentiment module (canonical location)
+pub use crate::constraint_grammar::sentiment::VADScores;
 
 /// Errors that can occur in context equilibrium
 #[derive(Debug, Error)]
@@ -22,48 +31,30 @@ pub enum ContextError {
     VectorStore(String),
 }
 
-/// VAD (Valence, Arousal, Dominance) sentiment scores
-///
-/// # Timeless Code (Listing 4)
-///
-/// ```rust
-/// // This is affective science: valence is [-1, 1]
-/// equilibrium_weight = (vad.valence + 1.0) / 2.0;
-/// ```
-///
-/// This is timeless because Russell's circumplex model of affect
-/// is empirically validated across cultures.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct VADScores {
-    /// Valence: -1.0 (negative) to 1.0 (positive)
-    pub valence: f64,
-    /// Arousal: 0.0 (calm) to 1.0 (energetic)
-    pub arousal: f64,
-    /// Dominance: 0.0 (submissive) to 1.0 (dominant)
-    pub dominance: f64,
-}
-
-impl Default for VADScores {
-    fn default() -> Self {
-        Self {
-            valence: 0.0,
-            arousal: 0.5,
-            dominance: 0.7,
-        }
-    }
-}
-
-impl VADScores {
-    /// Calculate equilibrium weight from VAD scores
-    ///
-    /// Maps valence from [-1, 1] to [0, 1] for equilibrium calculation.
-    pub fn equilibrium_weight(&self) -> f64 {
-        // Timeless Code Listing 4: VAD conversion
-        (self.valence + 1.0) / 2.0
-    }
-}
-
 /// A tensor/vector in the embedding space
+///
+/// Represents a point in the frozen territory of the model's parameter space.
+/// Tensors are the fundamental unit for semantic navigation.
+///
+/// # Timeless Code Principles
+///
+/// The **cosine similarity** calculation (Timeless Code Listing 2) implemented
+/// here is timeless because:
+///
+/// 1. **Cosine similarity is geometric**: It measures the angle between vectors
+///    in high-dimensional space, independent of magnitude
+///
+/// 2. **Angle is invariant to scaling**: Whether embeddings are 384-dim, 768-dim,
+///    or 1536-dim, the angle between "happy" and "joyful" remains the same
+///
+/// 3. **Dot product is universal**: `a · b = |a| |b| cos(θ)` holds in any
+///    vector space with inner product
+///
+/// This means cosine similarity will work the same way whether:
+/// - Word2Vec (2013)
+/// - BERT (2018)
+/// - GPT-4 (2023)
+/// - GPT-N (year 3000)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tensor {
     data: Vec<f64>,
@@ -72,17 +63,35 @@ pub struct Tensor {
 
 impl Tensor {
     /// Create a new tensor from a vector
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Vector of floating-point values representing the tensor
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use equilibrium_tokens::constraint_grammar::context::Tensor;
+    ///
+    /// let tensor = Tensor::new(vec![1.0, 2.0, 3.0]);
+    /// assert_eq!(tensor.data(), &[1.0, 2.0, 3.0]);
+    /// ```
     pub fn new(data: Vec<f64>) -> Self {
         let shape = vec![data.len()];
         Self { data, shape }
     }
 
     /// Get the tensor data
+    ///
+    /// Returns a slice of the tensor's underlying data.
     pub fn data(&self) -> &[f64] {
         &self.data
     }
 
     /// Get tensor shape
+    ///
+    /// Returns the shape of the tensor as a slice of dimensions.
+    /// For a 1D tensor, this will be `[length]`.
     pub fn shape(&self) -> &[usize] {
         &self.shape
     }
@@ -98,11 +107,69 @@ impl Tensor {
     ///
     /// This is timeless because it's how vector similarity works
     /// regardless of embedding dimension.
+    ///
+    /// # Why Cosine Similarity Is Timeless
+    ///
+    /// 1. **Geometric fundamental**: The cosine of the angle between vectors
+    ///    is invariant to the embedding dimension
+    ///
+    /// 2. **Magnitude independence**: Only direction matters, not length
+    ///    - "happy" × 100 and "happy" × 0.01 have same direction
+    ///    - Both are equally similar to "joyful"
+    ///
+    /// 3. **Range [−1, 1]**:
+    ///    - 1.0: Identical direction (perfect similarity)
+    ///    - 0.0: Orthogonal (unrelated)
+    ///    - −1.0: Opposite direction (antonyms)
+    ///
+    /// # Mathematical Foundation
+    ///
+    /// ```text
+    /// cosine_similarity(a, b) = (a · b) / (||a|| × ||b||)
+    ///
+    /// Where:
+    ///   a · b = Σ(aᵢ × bᵢ)           [dot product]
+    ///   ||a|| = √(Σ aᵢ²)            [magnitude]
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The tensor to compare with
+    ///
+    /// # Returns
+    ///
+    /// A value in [−1, 1] representing the cosine similarity:
+    /// - **1.0**: Vectors point in same direction (maximally similar)
+    /// - **0.0**: Vectors are orthogonal (unrelated)
+    /// - **−1.0**: Vectors point in opposite directions (maximally dissimilar)
+    ///
+    /// # Special Cases
+    ///
+    /// - Returns 0.0 if dimensions don't match
+    /// - Returns 0.0 if either vector has zero magnitude
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use equilibrium_tokens::constraint_grammar::context::Tensor;
+    /// let a = Tensor::new(vec![1.0, 2.0, 3.0]);
+    /// let b = Tensor::new(vec![2.0, 4.0, 6.0]); // Same direction, 2× magnitude
+    /// let c = Tensor::new(vec![-1.0, -2.0, -3.0]); // Opposite direction
+    ///
+    /// // Same direction = 1.0
+    /// assert!((a.cosine_similarity(&b) - 1.0).abs() < 0.001);
+    ///
+    /// // Opposite direction = -1.0
+    /// assert!((a.cosine_similarity(&c) + 1.0).abs() < 0.001);
+    /// ```
     pub fn cosine_similarity(&self, other: &Tensor) -> f64 {
+        // Dimension mismatch: vectors in different spaces
         if self.data.len() != other.data.len() {
             return 0.0;
         }
 
+        // Timeless Code Listing 2: Cosine similarity calculation
+        // This is geometry: angle between vectors in high-dimensional space
         let dot_product: f64 = self.data.iter()
             .zip(other.data.iter())
             .map(|(a, b)| a * b)
@@ -111,10 +178,12 @@ impl Tensor {
         let magnitude_a: f64 = self.data.iter().map(|x| x * x).sum::<f64>().sqrt();
         let magnitude_b: f64 = other.data.iter().map(|x| x * x).sum::<f64>().sqrt();
 
+        // Zero magnitude: undefined direction
         if magnitude_a == 0.0 || magnitude_b == 0.0 {
             return 0.0;
         }
 
+        // Cosine of angle: (a · b) / (||a|| × ||b||)
         dot_product / (magnitude_a * magnitude_b)
     }
 
@@ -355,7 +424,7 @@ mod tests {
     fn test_tensor_interpolation() {
         let a = Tensor::new(vec![1.0, 0.0]);
         let b = Tensor::new(vec![0.0, 1.0]);
-        let c = Tensor::new(vec![0.5, 0.5]);
+        let _c = Tensor::new(vec![0.5, 0.5]); // Unused in this test
 
         let result = a.interpolate_weighted(&[b], &[0.5]);
         // Result should be closer to [1.0, 0.5] (a + 0.5*b)

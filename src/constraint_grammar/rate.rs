@@ -2,6 +2,35 @@
 //!
 //! The temporal constraint governing token flow. Ensures output rate matches
 //! input rate with sub-2ms jitter using hardware timers.
+//!
+//! # Timeless Code Principles
+//!
+//! This module implements the **temporal adverbial** of the constraint grammar,
+//! governing how tokens flow through time with precise control.
+//!
+//! ## Timeless Code (Listing 1): The Physics of Time
+//!
+//! ```rust
+//! // This is physics: time intervals are measured in nanoseconds
+//! let interval_ns = (1_000_000_000.0 / target_rate_hz) as u64;
+//! ```
+//!
+//! This calculation is timeless because:
+//! 1. **Nanoseconds are fundamental** - 1 second = 1,000,000,000 nanoseconds by definition
+//! 2. **Rate to interval conversion** - Hz (cycles/second) to nanoseconds is pure physics
+//! 3. **Independent of hardware** - Whether ARM, x86, RISC-V, or quantum computers, this holds
+//!
+//! The formula `interval_ns = 1_000_000_000 / rate_hz` will be valid in:
+//! - 2025: Current hardware
+//! - 2050: Quantum computers
+//! - 2100: Neuromorphic chips
+//! - 3000: Whatever computes thoughts
+//!
+//! ## Design Goals
+//!
+//! - **Jitter < 2ms**: Hardware-level precision for token emission
+//! - **Rate matching**: Output rate tracks input rate smoothly
+//! - **Graceful degradation**: Fails safely if timing constraints violated
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
@@ -18,6 +47,19 @@ pub enum RateError {
 }
 
 /// Configuration for rate equilibrium
+///
+/// Defines the target token emission rate and acceptable jitter threshold.
+///
+/// # Fields
+///
+/// - **target_rate_hz**: Desired token rate in tokens/second (Hz)
+///   - Conversational speech: ~2.0 Hz (120 words/minute ÷ ~1 word/token)
+///   - Fast typing: ~5.0 Hz
+///   - Slow reading: ~0.5 Hz
+///
+/// - **jitter_threshold_ms**: Maximum acceptable timing variance
+///   - Human perception threshold: ~2-3ms for rhythm detection
+///   - Design goal: <2ms for imperceptible jitter
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RateConfig {
     /// Target token rate in Hz (tokens/second)
@@ -28,6 +70,21 @@ pub struct RateConfig {
 
 impl RateConfig {
     /// Create a new rate configuration with defaults
+    ///
+    /// # Arguments
+    ///
+    /// * `target_rate_hz` - Target token emission rate in Hz
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use equilibrium_tokens::RateConfig;
+    ///
+    /// // Conversational rate: 2 tokens/second
+    /// let config = RateConfig::new(2.0);
+    /// assert_eq!(config.target_rate_hz, 2.0);
+    /// assert_eq!(config.jitter_threshold_ms, 2.0); // Default
+    /// ```
     pub fn new(target_rate_hz: f64) -> Self {
         Self {
             target_rate_hz,
@@ -36,6 +93,12 @@ impl RateConfig {
     }
 
     /// Validate the configuration
+    ///
+    /// Ensures the target rate is positive and physically meaningful.
+    ///
+    /// # Errors
+    ///
+    /// Returns `RateError::InvalidRate` if target_rate_hz <= 0.
     pub fn validate(&self) -> Result<(), RateError> {
         if self.target_rate_hz <= 0.0 {
             return Err(RateError::InvalidRate { rate: self.target_rate_hz });
@@ -58,14 +121,42 @@ impl RateConfig {
 ///
 /// This is timeless because it's how computers measure time.
 /// It will be true in 100 years.
+///
+/// # Implementation Notes
+///
+/// - Uses atomic operations for thread-safe rate updates
+/// - Stores rate as integer (rate * 1000) for millisecond precision
+/// - Tracks last emission time for jitter measurement
+/// - Jitter calculation uses system time (not CPU cycles) for portability
+///
+/// # Thread Safety
+///
+/// This struct uses `AtomicU64` for all mutable state, making it safe
+/// to share across threads with `Send` and `Sync` traits.
 pub struct RateEquilibrium {
     /// Target rate stored as integer (rate * 1000 for precision)
+    ///
+    /// Storing as integer avoids floating-point precision issues when
+    /// comparing rates across threads. Multiply by 1000 gives millisecond
+    /// precision, sufficient for human conversation rates.
     target_rate: AtomicU64,
+
     /// Current measured rate
+    ///
+    /// Updated by actual token emissions. Used to calculate how well
+    /// we're matching the target rate.
     current_rate: AtomicU64,
+
     /// Jitter threshold in milliseconds
+    ///
+    /// Maximum acceptable variance between expected and actual emission times.
+    /// Human perception threshold is ~2-3ms for rhythm detection.
     jitter_threshold: f64,
+
     /// Last emission time for jitter calculation
+    ///
+    /// Unix timestamp in milliseconds of the last token emission.
+    /// Used to measure actual interval between emissions.
     last_emission: AtomicU64,
 }
 
@@ -124,18 +215,64 @@ impl RateEquilibrium {
 
     /// Calculate target interval in nanoseconds
     ///
-    /// This is the timeless calculation that converts Hz to nanoseconds.
+    /// This is the **timeless calculation** that converts Hz to nanoseconds.
+    ///
+    /// # Timeless Code (Listing 1)
+    ///
+    /// ```rust
+    /// // This is physics: time intervals are measured in nanoseconds
+    /// let interval_ns = (1_000_000_000.0 / rate_hz) as u64;
+    /// ```
+    ///
+    /// # Why This Is Timeless
+    ///
+    /// 1. **Definition of second**: 1 second = 1,000,000,000 nanoseconds (SI prefix)
+    /// 2. **Definition of Hz**: 1 Hz = 1 cycle/second
+    /// 3. **Inverse relationship**: interval = 1/rate
+    ///
+    /// Therefore: interval_ns = 1_000_000_000 / rate_hz
+    ///
+    /// This formula will never change because it's derived from first principles.
+    ///
+    /// # Arguments
+    ///
+    /// * `rate_hz` - Target rate in Hz (tokens/second)
+    ///
+    /// # Returns
+    ///
+    /// Interval in nanoseconds between token emissions.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use equilibrium_tokens::{RateEquilibrium, RateConfig};
+    /// # let rate_eq = RateEquilibrium::new(RateConfig::new(2.0)).unwrap();
+    /// // 2 Hz = 2 tokens/second = 1 token per 500,000,000 nanoseconds
+    /// let interval = rate_eq.calculate_interval_ns(2.0);
+    /// assert_eq!(interval, 500_000_000);
+    ///
+    /// // 1 Hz = 1 token/second = 1,000,000,000 nanoseconds
+    /// let interval = rate_eq.calculate_interval_ns(1.0);
+    /// assert_eq!(interval, 1_000_000_000);
+    /// ```
     pub fn calculate_interval_ns(&self, rate_hz: f64) -> u64 {
         // Timeless Code Listing 1: Timer interval calculation
+        // This is physics: 1 second = 1,000,000,000 nanoseconds
+        // interval_ns = 1_000_000_000 / rate_hz
         (1_000_000_000.0 / rate_hz) as u64
     }
 
     /// Get current target rate in Hz
+    ///
+    /// Returns the target rate that was set via `on_rate_change` or construction.
     pub fn get_target_rate(&self) -> f64 {
         self.target_rate.load(Ordering::Relaxed) as f64 / 1000.0
     }
 
     /// Get current measured rate in Hz
+    ///
+    /// Returns the actual emission rate as measured by `emit_token`.
+    /// Returns 0.0 if no tokens have been emitted yet.
     pub fn get_current_rate(&self) -> f64 {
         self.current_rate.load(Ordering::Relaxed) as f64 / 1000.0
     }
@@ -143,7 +280,8 @@ impl RateEquilibrium {
     /// Calculate rate weight for equilibrium
     ///
     /// Returns a value between 0 and 1 representing how well the current
-    /// rate matches the target rate.
+    /// rate matches the target rate. This weight is used in the multiplicative
+    /// equilibrium calculation.
     ///
     /// # Formula
     ///
@@ -151,17 +289,40 @@ impl RateEquilibrium {
     /// weight = 1 - |rate_in - rate_out| / max(rate_in, rate_out)
     /// ```
     ///
-    /// If current_rate is 0 (not yet measured), assumes perfect match.
+    /// # Special Cases
+    ///
+    /// - If `current_rate` is 0 (not yet measured), returns 1.0 (assumes perfect match)
+    /// - If `input_rate` equals `current_rate`, returns 1.0 (perfect match)
+    /// - If rates differ significantly, returns lower value
+    ///
+    /// # Why This Formula
+    ///
+    /// This is a normalized relative error that gives:
+    /// - 1.0 when rates match perfectly
+    /// - 0.0 when rates are infinitely different
+    /// - Graceful degradation for small differences
+    ///
+    /// # Arguments
+    ///
+    /// * `input_rate` - The measured input rate in Hz
+    ///
+    /// # Returns
+    ///
+    /// A value in [0, 1] representing rate match quality.
     pub fn calculate_rate_weight(&self, input_rate: f64) -> f64 {
         let output_rate = self.get_current_rate();
 
         // If we haven't measured output rate yet, assume it matches input
+        // This prevents the system from starting with zero confidence
         if output_rate == 0.0 {
             return 1.0;
         }
 
         let max_rate = input_rate.max(output_rate);
         let diff = (input_rate - output_rate).abs();
+
+        // Normalized relative error: [0, 1]
+        // 1.0 = perfect match, 0.0 = completely different
         1.0 - (diff / max_rate)
     }
 

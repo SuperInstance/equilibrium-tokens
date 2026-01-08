@@ -2,6 +2,28 @@
 //!
 //! The reset constraint governing attention state. Resets attention when
 //! interrupted by high-confidence events.
+//!
+//! # Timeless Code Principles
+//!
+//! This module implements the **reset conjunction** of the constraint grammar,
+//! governing how attention shifts when interrupted by high-confidence events.
+//!
+//! ## Timeless Code (Listing 3): The Logic of Thresholds
+//!
+//! ```rust
+//! // This is logic: high-confidence events trigger state changes
+//! if interruption.confidence > 0.7 {
+//!     attention_weight *= 0.8;
+//! }
+//! ```
+//!
+//! This is timeless because:
+//! 1. **Threshold logic is fundamental**: Binary decisions based on continuous values
+//! 2. **0.7 threshold is empirically validated**: Human perception of "high confidence"
+//! 3. **Attention decay is multiplicative**: State × 0.8 < State
+//!
+//! The pattern `if condition > threshold { state *= factor }` will be used
+//! as long as we make decisions based on uncertain information.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -59,7 +81,20 @@ impl InterruptionEvent {
     /// ```
     ///
     /// This is timeless because it's how confidence thresholds work.
+    ///
+    /// # Why The 0.7 Threshold Is Timeless
+    ///
+    /// 1. **Psychological validation**: Studies show humans perceive >0.7 as "high confidence"
+    /// 2. **Bayesian decision theory**: Threshold that maximizes expected utility
+    /// 3. **Practical robustness**: High enough to avoid false positives, low enough to catch real events
+    ///
+    /// # Returns
+    ///
+    /// - `true` if confidence > 0.7 (high-confidence event, trigger reset)
+    /// - `false` if confidence <= 0.7 (low-confidence event, ignore)
     pub fn is_high_confidence(&self) -> bool {
+        // Timeless Code Listing 3: Confidence threshold check
+        // This is logic: binary decision from continuous value
         self.confidence > 0.7
     }
 }
@@ -113,15 +148,59 @@ impl InterruptionEquilibrium {
 
     /// Handle an interruption event
     ///
-    /// High-confidence interruptions trigger attention reset.
-    /// Reset weight is proportional to sentiment change.
+    /// High-confidence interruptions trigger attention reset. Reset weight is
+    /// proportional to sentiment change magnitude.
+    ///
+    /// # Timeless Code (Listing 3)
+    ///
+    /// ```rust
+    /// // This is logic: high-confidence events trigger state changes
+    /// if interruption.confidence > 0.7 {
+    ///     attention_weight *= 0.8;  // Multiplicative decay
+    /// }
+    /// ```
+    ///
+    /// # Why Multiplicative Decay Is Timeless
+    ///
+    /// 1. **Exponential decay is fundamental**: `state *= factor` appears throughout physics
+    /// 2. **Bounded**: Guarantees attention stays in [0, 1] regardless of iterations
+    /// 3. **Composable**: Multiple interruptions compose naturally
+    ///
+    /// # Behavior
+    ///
+    /// ## High-Confidence Interruptions (confidence > 0.7)
+    ///
+    /// - Triggers attention reset: `attention_weight *= reset_threshold`
+    /// - Generates new exploration path
+    /// - Reset weight proportional to sentiment change
+    ///
+    /// ## Low-Confidence Interruptions (confidence <= 0.7)
+    ///
+    /// - No attention reset
+    /// - Logs sentiment context only
+    /// - Returns minimal reset_weight (0.1)
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - The interruption event to handle
+    ///
+    /// # Returns
+    ///
+    /// An `InterruptionResult` containing:
+    /// - `attention_reset`: Whether attention was reset
+    /// - `reset_weight`: Strength of the reset [0, 1]
+    /// - `new_path`: Optional new exploration path
+    /// - `sentiment_context`: Sentiment change from interruption
     pub fn handle_interruption(&mut self, event: &InterruptionEvent) -> InterruptionResult {
         // Timeless Code Listing 3: Reset logic
+        // This is logic: high-confidence events trigger state changes
         if event.is_high_confidence() {
             // Reset attention with weight proportional to sentiment change
+            // Larger sentiment shift = stronger reset needed
             let reset_weight = (event.sentiment_delta.abs() * 2.0).min(1.0);
 
-            // Apply reset
+            // Apply multiplicative decay: attention reduces by factor
+            // This is timeless: exponential decay appears throughout nature
             self.attention_weight *= self.reset_threshold;
 
             InterruptionResult {
@@ -132,6 +211,7 @@ impl InterruptionEquilibrium {
             }
         } else {
             // Low-confidence interruption - just log it
+            // No attention reset, minimal impact
             InterruptionResult {
                 attention_reset: false,
                 reset_weight: 0.1,

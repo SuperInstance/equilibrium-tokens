@@ -2,6 +2,20 @@
 //!
 //! The affective constraint governing path weighting. Weights navigation
 //! paths by emotional valence using the VAD model.
+//!
+//! # Timeless Code Principles
+//!
+//! This module implements the **affective adjective** of the constraint grammar,
+//! governing how emotional valence influences navigation through frozen territory
+//! using Russell's circumplex model of affect (VAD: Valence-Arousal-Dominance).
+//!
+//! **VAD Model Ranges:**
+//! - Valence: [-1, 1] where -1 is negative, 0 is neutral, +1 is positive
+//! - Arousal: [0, 1] where 0 is calm, 1 is energetic
+//! - Dominance: [0, 1] where 0 is submissive, 1 is dominant
+//!
+//! The valence range [-1, 1] is empirically validated across cultures and will
+//! remain valid for as long as human emotion exists.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -27,6 +41,21 @@ pub enum SentimentError {
 ///
 /// This is timeless because Russell's circumplex model of affect
 /// is empirically validated across cultures.
+///
+/// # Fields
+///
+/// - **valence**: Pleasure dimension [-1.0, 1.0]
+///   - -1.0: Extremely negative (fear, anger)
+///   - 0.0: Neutral (calm, bored)
+///   - +1.0: Extremely positive (joy, excitement)
+///
+/// - **arousal**: Activation dimension [0.0, 1.0]
+///   - 0.0: Low energy (sleepy, relaxed)
+///   - 1.0: High energy (alert, excited)
+///
+/// - **dominance**: Control dimension [0.0, 1.0]
+///   - 0.0: Submissive (controlled, helpless)
+///   - 1.0: Dominant (controlling, powerful)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VADScores {
     /// Valence: -1.0 (negative) to 1.0 (positive)
@@ -39,7 +68,18 @@ pub struct VADScores {
 
 impl VADScores {
     /// Create new VAD scores with validation
+    ///
+    /// # Arguments
+    ///
+    /// * `valence` - Value in [-1.0, 1.0] representing pleasure
+    /// * `arousal` - Value in [0.0, 1.0] representing activation
+    /// * `dominance` - Value in [0.0, 1.0] representing control
+    ///
+    /// # Errors
+    ///
+    /// Returns `SentimentError::InvalidScore` if any dimension is out of range.
     pub fn new(valence: f64, arousal: f64, dominance: f64) -> Result<Self, SentimentError> {
+        // Validate valence range: [-1, 1]
         if !(-1.0..=1.0).contains(&valence) {
             return Err(SentimentError::InvalidScore {
                 score: valence,
@@ -47,6 +87,7 @@ impl VADScores {
             });
         }
 
+        // Validate arousal range: [0, 1]
         if !(0.0..=1.0).contains(&arousal) {
             return Err(SentimentError::InvalidScore {
                 score: arousal,
@@ -54,6 +95,7 @@ impl VADScores {
             });
         }
 
+        // Validate dominance range: [0, 1]
         if !(0.0..=1.0).contains(&dominance) {
             return Err(SentimentError::InvalidScore {
                 score: dominance,
@@ -69,6 +111,11 @@ impl VADScores {
     }
 
     /// Default neutral sentiment
+    ///
+    /// Returns VAD scores representing a neutral emotional state:
+    /// - valence: 0.0 (neither positive nor negative)
+    /// - arousal: 0.5 (moderate energy)
+    /// - dominance: 0.7 (slightly dominant, typical for conversation)
     pub fn neutral() -> Self {
         Self {
             valence: 0.0,
@@ -79,13 +126,45 @@ impl VADScores {
 
     /// Calculate equilibrium weight from VAD scores
     ///
+    /// # Timeless Code (Listing 4)
+    ///
+    /// ```rust
+    /// // This is affective science: valence is [-1, 1]
+    /// equilibrium_weight = (vad.valence + 1.0) / 2.0;
+    /// ```
+    ///
     /// Maps valence from [-1, 1] to [0, 1] for equilibrium calculation.
+    /// This transformation is timeless because:
+    /// 1. Valence range is empirically validated
+    /// 2. Linear normalization preserves relative differences
+    /// 3. Result [0, 1] is usable for probability calculations
+    ///
+    /// # Returns
+    ///
+    /// A value in [0, 1] where:
+    /// - 0.0 represents most negative valence (-1.0)
+    /// - 0.5 represents neutral valence (0.0)
+    /// - 1.0 represents most positive valence (+1.0)
     pub fn equilibrium_weight(&self) -> f64 {
         // Timeless Code Listing 4: VAD conversion
+        // Maps [-1, 1] -> [0, 1] using: (valence + 1) / 2
         (self.valence + 1.0) / 2.0
     }
 
     /// Calculate combined path weight from all VAD dimensions
+    ///
+    /// Combines all three VAD dimensions multiplicatively to produce
+    /// a single weight for path selection through frozen territory.
+    ///
+    /// # Formula
+    ///
+    /// ```text
+    /// path_weight = equilibrium_weight(valence) × arousal × dominance
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// A value in [0, 1] representing the overall affective weight.
     pub fn path_weight(&self) -> f64 {
         let valence_weight = self.equilibrium_weight();
         valence_weight * self.arousal * self.dominance
