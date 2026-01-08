@@ -325,10 +325,10 @@ When this architecture is used, you have:
 ## Next Steps
 
 1. ✅ **COMPLETED** - Create initial git commit
-2. ⏳ **TODO** - Add remote origin: `git remote add origin https://github.com/SuperInstance/equilibrium-tokens.git`
-3. ⏳ **TODO** - Push to GitHub: `git push -u origin main`
-4. ⏳ **TODO** - Tag v0.1.0 release
-5. ⏳ **TODO** - Publish to crates.io (optional)
+2. ✅ **COMPLETED** - Add remote origin: `git remote add origin https://github.com/SuperInstance/equilibrium-tokens.git`
+3. ✅ **COMPLETED** - Push to GitHub: `git push -u origin main`
+4. ✅ **COMPLETED** - Tag v0.1.0 release
+5. ⏳ **OPTIONAL** - Publish to crates.io (requires crates.io account setup)
 
 ---
 
