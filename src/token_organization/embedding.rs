@@ -33,7 +33,7 @@ impl TokenEmbedder {
     }
 
     /// Create default embedder (384-dim, sentence-transformers style)
-    pub fn default() -> Self {
+    pub fn with_default_dimension() -> Self {
         Self::new(384)
     }
 
@@ -95,6 +95,12 @@ impl TokenEmbedder {
     /// Get embedding dimension
     pub fn dimension(&self) -> usize {
         self.dimension
+    }
+}
+
+impl Default for TokenEmbedder {
+    fn default() -> Self {
+        Self::with_default_dimension()
     }
 }
 

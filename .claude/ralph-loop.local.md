@@ -1,9 +1,9 @@
 ---
 active: true
 iteration: 1
-max_iterations: 1000
-completion_promise: "SUPERINSTANCE_COMPLETE"
-started_at: "2026-01-09T03:53:09Z"
+max_iterations: 0
+completion_promise: null
+started_at: "2026-01-09T04:19:21Z"
 ---
 
-Continue the SuperInstance orchestrator mission. Work on every tool until complete.
+Exhaustively work through the next phases of the project. stop when all repos are commented and all code is debugged and even audits of codebases done show any need for improvement

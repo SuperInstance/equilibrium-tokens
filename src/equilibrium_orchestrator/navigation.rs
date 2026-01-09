@@ -87,7 +87,7 @@ impl Navigator {
     /// Create with custom exploration factor
     pub fn with_exploration(exploration_factor: f64) -> Self {
         Self {
-            exploration_factor: exploration_factor.max(0.0).min(1.0),
+            exploration_factor: exploration_factor.clamp(0.0, 1.0),
         }
     }
 

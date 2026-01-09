@@ -39,7 +39,7 @@ impl OrchestratorState {
 
     /// Update equilibrium score
     pub fn update_equilibrium(&mut self, equilibrium: f64) {
-        self.equilibrium = equilibrium.max(0.0).min(1.0);
+        self.equilibrium = equilibrium.clamp(0.0, 1.0);
     }
 
     /// Update rate target

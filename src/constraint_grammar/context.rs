@@ -193,14 +193,13 @@ impl Tensor {
         let mut result = vec![0.0; dim];
 
         // Add self with weight 1.0
-        for i in 0..dim {
-            result[i] = self.data[i];
-        }
+        result.copy_from_slice(&self.data);
 
         // Add weighted contributions from others
         for (other, &weight) in others.iter().zip(weights.iter()) {
-            for i in 0..dim.min(other.data.len()) {
-                result[i] += other.data[i] * weight;
+            let limit = dim.min(other.data.len());
+            for (i, val) in result.iter_mut().enumerate().take(limit) {
+                *val += other.data[i] * weight;
             }
         }
 
